@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
-from ai_agent import graph, SYSTEM_PROMPT, parse_response
+from ai_agent import graph, SYSTEM_PROMPT, parse_response, emergency_call_tool
 
 # Step 1: Create app
 app = FastAPI()
@@ -25,6 +25,21 @@ async def ask(query: Query):
     inputs = {"messages": [("system", SYSTEM_PROMPT), ("user", query.message)]}
     stream = graph.stream(inputs, stream_mode="updates")
     tool_called_name, final_response = parse_response(stream)
+
+    # ✅ Handle emergency call explicitly
+    if tool_called_name == "emergency_call_tool":
+        try:
+            # use .func() to bypass the "tool_input" requirement
+            call_result = emergency_call_tool.func()
+            return {
+                "response": f"{call_result}",
+                "tool_called": tool_called_name
+            }
+        except Exception as e:
+            return {
+                "response": f"⚠️ Failed to place emergency call: {str(e)}",
+                "tool_called": tool_called_name
+            }
 
     return {
         "response": final_response,
