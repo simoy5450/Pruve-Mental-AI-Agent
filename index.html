@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Pruve AI Therapist</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<style>
+  body { font-family: 'Roboto', sans-serif; }
+  .chat-bubble { 
+    max-width: 75%; 
+    padding: 12px 16px; 
+    border-radius: 12px; 
+    margin-bottom: 12px; 
+    line-height: 1.4; 
+    display: flex; 
+    align-items: flex-start; 
+    gap: 10px;
+  }
+  .chat-user { background: #6d28d9; align-self: flex-end; flex-direction: row-reverse; }
+  .chat-ai { background: #4c1d95; align-self: flex-start; }
+  .chat-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Typing animation */
+  .typing {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: #d1d5db;
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    background: #ddd;
+    border-radius: 50%;
+    animation: blink 1.4s infinite both;
+  }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+</style>
+</head>
+<body class="bg-violet-900 text-white flex h-screen">
+
+<!-- Sidebar -->
+<aside class="w-64 bg-violet-800 p-4 flex flex-col justify-between">
+  <div>
+    <div class="flex items-center justify-between mb-8">
+      <span class="material-icons">menu</span>
+    </div>
+    <button class="w-full flex items-center bg-violet-700 hover:bg-violet-600 text-white font-semibold py-2 px-4 rounded-full mb-6">
+      <span class="material-icons mr-2">add</span> New chat
+    </button>
+    <h2 class="text-sm text-gray-400 mb-2">Recent</h2>
+    <ul>
+      <li class="flex items-center p-2 rounded-lg hover:bg-violet-700 cursor-pointer">
+        <span class="material-icons mr-3">chat_bubble_outline</span>
+        <span>Coping with anxiety</span>
+      </li>
+      <li class="flex items-center p-2 rounded-lg hover:bg-violet-700 cursor-pointer">
+        <span class="material-icons mr-3">chat_bubble_outline</span>
+        <span>Building self-esteem</span>
+      </li>
+    </ul>
+  </div>
+  <div>
+    <ul>
+      <li class="flex items-center p-2 rounded-lg hover:bg-violet-700 cursor-pointer">
+        <span class="material-icons mr-3">help_outline</span> <span>Help</span>
+      </li>
+      <li class="flex items-center p-2 rounded-lg hover:bg-violet-700 cursor-pointer">
+        <span class="material-icons mr-3">history</span> <span>Activity</span>
+      </li>
+      <li class="flex items-center p-2 rounded-lg hover:bg-violet-700 cursor-pointer">
+        <span class="material-icons mr-3">settings</span> <span>Settings</span>
+      </li>
+      <li class="flex items-center p-2 mt-4">
+        <img id="user-avatar" class="w-8 h-8 rounded-full mr-3" 
+             src="https://i.pravatar.cc/40?img=5" alt="User"/>
+        <span id="username">User</span>
+        <button onclick="editProfile()" class="ml-2 text-sm text-blue-300 hover:underline">Edit</button>
+      </li>
+    </ul>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="flex-1 flex flex-col">
+  <header class="p-4 flex justify-between items-center border-b border-violet-700">
+    <h1 class="text-xl font-semibold">Pruve AI Therapist</h1>
+  </header>
+
+  <!-- Chat messages -->
+  <div id="chat-window" class="flex-1 overflow-y-auto p-8 flex flex-col space-y-2">
+    <div class="chat-bubble chat-ai">
+      <img class="chat-avatar" src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Nnx8ZmVtYWxlJTIwZG9jdG9yfGVufDB8fDB8fHww" alt="AI"/>
+      <span>👋 Hi, I’m Dr Priya. How can I support you today?</span>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <footer class="p-4 bg-violet-900">
+    <div class="max-w-4xl mx-auto">
+      <div class="bg-violet-800 rounded-full flex items-center p-2">
+        <input id="user-input" class="flex-1 bg-transparent outline-none px-4 text-white placeholder-gray-400" placeholder="Enter a prompt here..." type="text"/>
+        <button id="send-btn" class="p-2 bg-violet-700 hover:bg-violet-600 rounded-full ml-2">
+          <span class="material-icons">send</span>
+        </button>
+      </div>
+      <p class="text-xs text-gray-500 text-center mt-2">
+        Pruve AI may display inaccurate info, including about people, so double-check its responses.
+      </p>
+    </div>
+  </footer>
+</main>
+
+<!-- JS -->
+<script>
+  const BACKEND_URL = "http://127.0.0.1:8000/ask"; 
+  const chatWindow = document.getElementById("chat-window");
+  const userInput = document.getElementById("user-input");
+  const sendBtn = document.getElementById("send-btn");
+  let username = "User";
+  let userAvatar = "https://i.pravatar.cc/40?img=5";
+  let aiAvatar = "https://images.unsplash.com/photo-1683348858658-7c6b0eff2a16?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTV8fGZlbWFsZSUyMGRvY3RvcnxlbnwwfHwwfHx8MA%3D%3D";
+
+  // Add message
+  function addMessage(text, sender="ai", typing=false) {
+    const msg = document.createElement("div");
+    msg.classList.add("chat-bubble", sender === "user" ? "chat-user" : "chat-ai");
+
+    const avatar = document.createElement("img");
+    avatar.src = sender === "user" ? userAvatar : aiAvatar;
+    avatar.classList.add("chat-avatar");
+
+    const content = document.createElement("span");
+
+    if (typing) {
+      content.innerHTML = `Dr. Priya is typing <span class="dot"></span><span class="dot"></span><span class="dot"></span>`;
+      content.classList.add("typing");
+    } else {
+      content.textContent = text;
+    }
+
+    msg.appendChild(avatar);
+    msg.appendChild(content);
+    chatWindow.appendChild(msg);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+
+    return msg; // return element (so we can remove typing later)
+  }
+
+  // Send message
+  async function sendMessage() {
+    const text = userInput.value.trim();
+    if (!text) return;
+    addMessage(text, "user");
+    userInput.value = "";
+
+    // show typing animation
+    const typingBubble = addMessage("", "ai", true);
+
+    try {
+      const res = await fetch(BACKEND_URL, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ message: text })
+      });
+      const data = await res.json();
+
+      // remove typing bubble
+      chatWindow.removeChild(typingBubble);
+
+      // add AI response
+      addMessage(data.response || "No response received.", "ai");
+    } catch (err) {
+      chatWindow.removeChild(typingBubble);
+      addMessage("⚠️ Error: " + err.message, "ai");
+    }
+  }
+
+  sendBtn.addEventListener("click", sendMessage);
+  userInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") sendMessage();
+  });
+
+  // Profile edit function
+  function editProfile() {
+    const newName = prompt("Enter your name:", username);
+    const newAvatar = prompt("Enter image URL for profile:", userAvatar);
+    if (newName) {
+      username = newName;
+      document.getElementById("username").textContent = username;
+    }
+    if (newAvatar) {
+      userAvatar = newAvatar;
+      document.getElementById("user-avatar").src = userAvatar;
+    }
+  }
+</script>
+
+</body>
+</html>
